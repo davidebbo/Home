@@ -44,7 +44,7 @@ if (!$feed)
 $scriptPath = $myInvocation.MyCommand.Definition
 
 function Kvm-Help {
-@"
+[System.Console]::WriteLine(@"
 K Runtime Environment Version Manager - Build 10015
 
 USAGE: kvm <command> [options]
@@ -89,7 +89,7 @@ kvm alias <alias> <semver>|<alias> [-x86][-amd64] [-r|-runtime CLR|CoreCLR]
 kvm unalias <alias>
   remove the specified alias
 
-"@ -replace "`n","`r`n" | Write-Host
+"@)
 }
 
 function Kvm-Global-Setup {
@@ -99,41 +99,41 @@ function Kvm-Global-Setup {
   {
     $arguments = "-ExecutionPolicy unrestricted & '$scriptPath' setup -global -wait"
     Start-Process "$psHome\powershell.exe" -Verb runAs -ArgumentList $arguments -Wait
-    Write-Host "Adding $kvmBinPath to process PATH"
+    [System.Console]::WriteLine("Adding $kvmBinPath to process PATH")
     Set-Path (Change-Path $env:Path $kvmBinPath ($kvmBinPath))
-    Write-Host "Adding $globalKrePath;%USERPROFILE%\.kre to process KRE_HOME"
+    [System.Console]::WriteLine("Adding $globalKrePath;%USERPROFILE%\.kre to process KRE_HOME")
     $envKreHome = $env:KRE_HOME
     $envKreHome = Change-Path $envKreHome "%USERPROFILE%\.kre" ("%USERPROFILE%\.kre")
     $envKreHome = Change-Path $envKreHome $globalKrePath ($globalKrePath)
     $env:KRE_HOME = $envKreHome
-    Write-Host "Setup complete"
+    [System.Console]::WriteLine("Setup complete")
     break
   }
 
   $scriptFolder = [System.IO.Path]::GetDirectoryName($scriptPath)
 
-  Write-Host "Copying file $kvmBinPath\kvm.ps1"
+  [System.Console]::WriteLine("Copying file $kvmBinPath\kvm.ps1")
   md $kvmBinPath -Force | Out-Null
   copy "$scriptFolder\kvm.ps1" "$kvmBinPath\kvm.ps1"
 
-  Write-Host "Copying file $kvmBinPath\kvm.cmd"
+  [System.Console]::WriteLine("Copying file $kvmBinPath\kvm.cmd")
   copy "$scriptFolder\kvm.cmd" "$kvmBinPath\kvm.cmd"
 
-  Write-Host "Adding $kvmBinPath to process PATH"
+  [System.Console]::WriteLine("Adding $kvmBinPath to process PATH")
   Set-Path (Change-Path $env:Path $kvmBinPath ($kvmBinPath))
 
-  Write-Host "Adding $kvmBinPath to user PATH"
+  [System.Console]::WriteLine("Adding $kvmBinPath to user PATH")
   $userPath = [Environment]::GetEnvironmentVariable("Path", [System.EnvironmentVariableTarget]::User)
   $userPath = Change-Path $userPath $kvmBinPath ($kvmBinPath)
   [Environment]::SetEnvironmentVariable("Path", $userPath, [System.EnvironmentVariableTarget]::User)
 
-  Write-Host "Adding $globalKrePath;%USERPROFILE%\.kre to process KRE_HOME"
+  [System.Console]::WriteLine("Adding $globalKrePath;%USERPROFILE%\.kre to process KRE_HOME")
   $envKreHome = $env:KRE_HOME
   $envKreHome = Change-Path $envKreHome "%USERPROFILE%\.kre" ("%USERPROFILE%\.kre")
   $envKreHome = Change-Path $envKreHome $globalKrePath ($globalKrePath)
   $env:KRE_HOME = $envKreHome
 
-  Write-Host "Adding $globalKrePath;%USERPROFILE%\.kre to machine KRE_HOME"
+  [System.Console]::WriteLine("Adding $globalKrePath;%USERPROFILE%\.kre to machine KRE_HOME")
   $machineKreHome = [Environment]::GetEnvironmentVariable("KRE_HOME", [System.EnvironmentVariableTarget]::Machine)
   $machineKreHome = Change-Path $machineKreHome "%USERPROFILE%\.kre" ("%USERPROFILE%\.kre")
   $machineKreHome = Change-Path $machineKreHome $globalKrePath ($globalKrePath)
@@ -183,7 +183,7 @@ param(
   [string] $platform,
   [string] $architecture
 )
-  Write-Host "Determining latest version"
+  [System.Console]::WriteLine("Determining latest version")
 
   $url = "$feed/GetUpdates()?packageIds=%27KRE-$platform-$architecture%27&versions=%270.0%27&includePrerelease=true&includeAllVersions=false"
 
@@ -217,12 +217,12 @@ param(
     {
       rm $kreFolder -Recurse -Force
     } else {
-      Write-Host "$kreFullName already installed."
+      [System.Console]::WriteLine("$kreFullName already installed.")
       return;
     }
   }
 
-  Write-Host "Downloading" $kreFullName "from $feed"
+  [System.Console]::WriteLine("Downloading $kreFullName from $feed")
 
   #Downloading to temp location
   $kreTempDownload = Join-Path $packagesFolder "temp"
@@ -242,7 +242,7 @@ param(
   Do-Kvm-Unpack $tempKreFile $kreTempDownload
 
   md $kreFolder -Force | Out-Null
-  Write-Host "Installing to $kreFolder"
+  [System.Console]::WriteLine("Installing to $kreFolder")
   mv "$kreTempDownload\*" $kreFolder
   Remove-Item "$kreTempDownload" -Force | Out-Null
 }
@@ -252,16 +252,13 @@ param(
   [string] $kreFile,
   [string] $kreFolder
 )
-  Write-Host "Unpacking to" $kreFolder
+  [System.Console]::WriteLine("Unpacking to $kreFolder")
   try {
     #Shell will not recognize nupkg as a zip and throw, so rename it to zip
     $kreZip = [System.IO.Path]::ChangeExtension($kreFile, "zip")
     Rename-Item $kreFile $kreZip
-    #Use the shell to uncompress the nupkg
-    $shell_app=new-object -com shell.application
-    $zip_file = $shell_app.namespace($kreZip)
-    $destination = $shell_app.namespace($kreFolder)
-    $destination.Copyhere($zip_file.items(), 0x14) #0x4 = don't show UI, 0x10 = overwrite files
+    [Reflection.Assembly]::LoadWithPartialName( "System.IO.Compression.FileSystem" )
+    [System.IO.Compression.ZipFile]::ExtractToDirectory($kreZip, $kreFolder)
   }
   finally {
     #make it a nupkg again
@@ -319,7 +316,7 @@ param(
     }
 
     if ($folderExists) {
-      Write-Host "Target folder '$kreFolder' already exists"
+      [System.Console]::WriteLine("Target folder '$kreFolder' already exists")
     } else {
       $tempUnpackFolder = Join-Path $packageFolder "temp"
       $tempKreFile = Join-Path $tempUnpackFolder "$kreFullName.nupkg"
@@ -333,7 +330,7 @@ param(
 
       Do-Kvm-Unpack $tempKreFile $tempUnpackFolder
       md $kreFolder -Force | Out-Null
-      Write-Host "Installing to $kreFolder"
+      [System.Console]::WriteLine("Installing to $kreFolder")
       mv "$tempUnpackFolder\*" $kreFolder
       Remove-Item "$tempUnpackFolder" -Force | Out-Null
     }
@@ -426,7 +423,7 @@ param(
 
   if ($versionOrAlias -eq "none") {
     if ($persistent) {
-      Write-Host "Removing KRE from machine PATH"
+      [System.Console]::WriteLine("Removing KRE from machine PATH")
       $machinePath = [Environment]::GetEnvironmentVariable("Path", [System.EnvironmentVariableTarget]::Machine)
       $machinePath = Change-Path $machinePath "" ($globalKrePackages, $userKrePackages)
       [Environment]::SetEnvironmentVariable("Path", $machinePath, [System.EnvironmentVariableTarget]::Machine)
@@ -437,12 +434,12 @@ param(
   $kreFullName = Requested-VersionOrAlias "$versionOrAlias"
   $kreBin = Locate-KreBinFromFullName $kreFullName
   if ($kreBin -eq $null) {
-    Write-Host "Cannot find $kreFullName, do you need to run 'kvm install $versionOrAlias'?"
+    [System.Console]::WriteLine("Cannot find $kreFullName, do you need to run 'kvm install $versionOrAlias'?")
     return
   }
 
   if ($persistent) {
-    Write-Host "Adding $kreBin to machine PATH"
+    [System.Console]::WriteLine("Adding $kreBin to machine PATH")
     $machinePath = [Environment]::GetEnvironmentVariable("Path", [System.EnvironmentVariableTarget]::Machine)
     $machinePath = Change-Path $machinePath $kreBin ($globalKrePackages, $userKrePackages)
     [Environment]::SetEnvironmentVariable("Path", $machinePath, [System.EnvironmentVariableTarget]::Machine)
@@ -454,7 +451,7 @@ param(
   [string] $versionOrAlias
 )
   if ($versionOrAlias -eq "none") {
-    Write-Host "Removing KRE from process PATH"
+    [System.Console]::WriteLine("Removing KRE from process PATH")
     Set-Path (Change-Path $env:Path "" ($globalKrePackages, $userKrePackages))
     return
   }
@@ -462,11 +459,11 @@ param(
   $kreFullName = Requested-VersionOrAlias $versionOrAlias
   $kreBin = Locate-KreBinFromFullName $kreFullName
   if ($kreBin -eq $null) {
-    Write-Host "Cannot find $kreFullName, do you need to run 'kvm install $versionOrAlias'?"
+    [System.Console]::WriteLine("Cannot find $kreFullName, do you need to run 'kvm install $versionOrAlias'?")
     return
   }
 
-  Write-Host "Adding" $kreBin "to process PATH"
+  [System.Console]::WriteLine("Adding $kreBin to process PATH")
   Set-Path (Change-Path $env:Path $kreBin ($globalKrePackages, $userKrePackages))
 }
 
@@ -475,11 +472,11 @@ param(
   [string] $versionOrAlias
 )
   if ($versionOrAlias -eq "none") {
-    Write-Host "Removing KRE from process PATH"
+    [System.Console]::WriteLine("Removing KRE from process PATH")
     Set-Path (Change-Path $env:Path "" ($globalKrePackages, $userKrePackages))
 
     if ($persistent) {
-      Write-Host "Removing KRE from user PATH"
+      [System.Console]::WriteLine("Removing KRE from user PATH")
       $userPath = [Environment]::GetEnvironmentVariable("Path", [System.EnvironmentVariableTarget]::User)
       $userPath = Change-Path $userPath "" ($globalKrePackages, $userKrePackages)
       [Environment]::SetEnvironmentVariable("Path", $userPath, [System.EnvironmentVariableTarget]::User)
@@ -491,15 +488,15 @@ param(
 
   $kreBin = Locate-KreBinFromFullName $kreFullName
   if ($kreBin -eq $null) {
-    Write-Host "Cannot find $kreFullName, do you need to run 'kvm install $versionOrAlias'?"
+    [System.Console]::WriteLine("Cannot find $kreFullName, do you need to run 'kvm install $versionOrAlias'?")
     return
   }
 
-  Write-Host "Adding" $kreBin "to process PATH"
+  [System.Console]::WriteLine("Adding $kreBin to process PATH")
   Set-Path (Change-Path $env:Path $kreBin ($globalKrePackages, $userKrePackages))
 
   if ($persistent) {
-    Write-Host "Adding $kreBin to user PATH"
+    [System.Console]::WriteLine("Adding $kreBin to user PATH")
     $userPath = [Environment]::GetEnvironmentVariable("Path", [System.EnvironmentVariableTarget]::User)
     $userPath = Change-Path $userPath $kreBin ($globalKrePackages, $userKrePackages)
     [Environment]::SetEnvironmentVariable("Path", $userPath, [System.EnvironmentVariableTarget]::User)
@@ -519,9 +516,9 @@ param(
   md ($userKrePath + "\alias\") -Force | Out-Null
   $aliasFilePath=$userKrePath + "\alias\" + $name + ".txt"
   if (!(Test-Path $aliasFilePath)) {
-    Write-Host "Alias '$name' does not exist"
+    [System.Console]::WriteLine("Alias '$name' does not exist")
   } else {
-    Write-Host "Alias '$name' is set to" (Get-Content ($userKrePath + "\alias\" + $name + ".txt"))
+    [System.Console]::WriteLine("Alias '$name' is set to " + (Get-Content ($userKrePath + "\alias\" + $name + ".txt")))
   }
 }
 
@@ -533,7 +530,7 @@ param(
   $kreFullName = Requested-VersionOrAlias $value
   $aliasFilePath = $userKrePath + "\alias\" + $name + ".txt"
   $action = if (Test-Path $aliasFilePath) { "Updating" } else { "Setting" }
-  Write-Host "$action alias '$name' to '$kreFullName'"
+  [System.Console]::WriteLine("$action alias '$name' to '$kreFullName'")
   md ($userKrePath + "\alias\") -Force | Out-Null
   $kreFullName | Out-File ($aliasFilePath) ascii
 }
@@ -544,10 +541,10 @@ param(
 )
   $aliasPath=$userKrePath + "\alias\" + $name + ".txt"
   if (Test-Path -literalPath "$aliasPath") {
-      Write-Host "Removing alias $name"
+      [System.Console]::WriteLine("Removing alias $name")
       Remove-Item -literalPath $aliasPath
   } else {
-      Write-Host "Cannot remove alias, '$name' is not a valid alias name"
+      [System.Console]::WriteLine("Cannot remove alias, '$name' is not a valid alias name")
   }
 }
 
@@ -691,15 +688,15 @@ function Validate-And-Santitise-Switches()
     if (!$match) {throw "'$runtime' is not a valid runtime"}
     Set-Variable -Name "selectedRuntime" -Value $match -Scope Script
   } elseif ($svr50) {
-    Write-Host "Warning: -svr50 is deprecated, use -runtime CLR for new packages."
+    [System.Console]::WriteLine("Warning: -svr50 is deprecated, use -runtime CLR for new packages.")
     Set-Variable -Name "selectedRuntime" -Value "svr50" -Scope Script
   } elseif ($svrc50) {
-    Write-Host "Warning: -svrc50 is deprecated, use -runtime CoreCLR for new packages."
+    [System.Console]::WriteLine("Warning: -svrc50 is deprecated, use -runtime CoreCLR for new packages.")
     Set-Variable -Name "selectedRuntime" -Value "svrc50" -Scope Script
   }
 
   if ($x64) {
-    Write-Host "Warning: -x64 is deprecated, use -amd64 for new packages."
+    [System.Console]::WriteLine("Warning: -x64 is deprecated, use -amd64 for new packages.")
     Set-Variable -Name "selectedArch" -Value "x64" -Scope Script
   } elseif ($amd64) {
     Set-Variable -Name "selectedArch" -Value "amd64" -Scope Script
@@ -736,10 +733,10 @@ try {
   }
 }
 catch {
-  Write-Host $_ -ForegroundColor Red ;
-  Write-Host "Type 'kvm help' for help on how to use kvm."
+  [System.Console]::WriteLine($_);
+  [System.Console]::WriteLine("Type 'kvm help' for help on how to use kvm.")
 }
 if ($wait) {
-  Write-Host "Press any key to continue ..."
+  [System.Console]::WriteLine("Press any key to continue ...")
   $x = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown,AllowCtrlC")
 }
